@@ -76,24 +76,32 @@ def del_a(html):
 # 获取饮食宜忌数据列表
 def food_list(disease_id, food_td):
     data_food_list = []
+    name_list = []
+    reason_list = []
+    suggest_list = []
+    i = 0
     # food_name_list
     for name_td in food_td[::3]:
         name = name_td.get_text()
-        # food_reason_list
-        for reason_td in food_td[1::3]:
-            reason = reason_td.get_text()
-            # food_suggest_list
-            for suggest_td in food_td[2::3]:
-                suggest = suggest_td.get_text()
-                food_info_tuple = (disease_id, name, reason, suggest)
-                data_food_list.append(food_info_tuple)
+        name_list.append(name)
+    # food_reason_list
+    for reason_td in food_td[1::3]:
+        reason = reason_td.get_text()
+        reason_list.append(reason)
+    # food_suggest_list
+    for suggest_td in food_td[2::3]:
+        suggest = suggest_td.get_text()
+        suggest_list.append(suggest)
+    for food in name_list:
+        data_food_list.append((disease_id, name_list[i], reason_list[i], suggest_list[i]))
+        i += 1
     return data_food_list
 
 
 # 生成疾病所有page页的url，并调用get_jbk_url方法
 def spider():
     # 页码总数
-    page_num = 2
+    page_num = 100
     # 爬取指定数量的页面
     i = 1
     page_url_list = []
@@ -109,12 +117,9 @@ def spider():
         jbk_url_list = get_jbk_url(page)
         url_list.extend(jbk_url_list)
     # 爬取疾病详情页面中首页的数据
-    for jb_url in url_list[0:1]:
+    for jb_url in url_list:
         jb_url += "//"
         get_jbk_content(jb_url)
-    # # 爬取饮食宜忌的数据
-    # for jb_url in url_list[0:1]:
-    #     get_food(jb_url + "/")
 
 
 # 获取分页下的疾病URL地址,并返回列表
