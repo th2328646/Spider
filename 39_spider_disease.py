@@ -10,6 +10,7 @@
 
 
 import urllib2
+from urllib2 import HTTPError
 import urllib
 import re
 import MySQLdb
@@ -52,9 +53,13 @@ def send_request(url):
     user_agent = 'Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)'
     headers = {'User-Agent': user_agent}
     request_all = urllib2.Request(url, headers=headers)
-    get_all = urllib2.urlopen(request_all)
-    html = get_all.read()
-    return html
+    try:
+        get_all = urllib2.urlopen(request_all)
+        html = get_all.read()
+        return html
+    except HTTPError, e:
+        print ('Error code', e.code)
+        return False
 
 
 # 编码转换函数(gbk->utf8)
@@ -103,28 +108,35 @@ def spider():
     # 页码总数
     page_num = 100
     # 爬取指定数量的页面
-    i = 1
+    i = 40
     page_url_list = []
-    url_list = []
     # 生成页码URL列表
-    while i < page_num:
+    while i <= page_num:
         url = 'http://jbk.39.net/'
         url = url + 'bw_p' + str(i) + "/"
         page_url_list.append(url)
         i += 1
     # 生产疾病URL列表
     for page in page_url_list:
+        url_list = []
         jbk_url_list = get_jbk_url(page)
+        if not jbk_url_list:
+            continue
         url_list.extend(jbk_url_list)
-    # 爬取疾病详情页面中首页的数据
-    for jb_url in url_list:
-        jb_url += "//"
-        get_jbk_content(jb_url)
+        print url_list
+        # 爬取疾病详情页面中首页的数据
+        for jb_url in url_list:
+            jb_url += "//"
+            if 'zhengzhuang' in jb_url:
+                continue
+            print get_jbk_content(jb_url)
 
 
 # 获取分页下的疾病URL地址,并返回列表
 def get_jbk_url(url):
     html = send_request(url)
+    if not html:
+        return False
     h3 = re.findall(r"<h3.*?>.*?</h3>", html)
     url_list = []
     for u in h3:
@@ -143,6 +155,7 @@ def get_jbk_content(url):
 
     # 获取文章标题 article_title
     jb_name = soup.h1.string
+    print jb_name
     # 将数据插入表disease
     data_name = (jb_name,)
     sql = "INSERT INTO disease(name) VALUES(%s)"
@@ -150,7 +163,9 @@ def get_jbk_content(url):
 
     # 获取疾病首页信息
     info_dict = {}
-    jbk_info = soup.find_all(class_='info')
+    jbk_info = soup.select(".info")
+    if not jbk_info:
+        return "No .info"
     info_soup = BeautifulSoup(str(jbk_info[0]), "lxml")
     info_select = info_soup.select('li')
     lable_list = []
@@ -394,27 +409,41 @@ def get_food(url, disease_id):
     url_ysbj = url + "ysbj"
     html = send_request(url_ysbj)
     soup_ysbj = BeautifulSoup(html, "lxml")
-    food_text = soup_ysbj.select('.yinshi_title')
-    usefood_text = food_text[0].get_text()
-    unusefood_text = food_text[1].get_text()
     food_table = soup_ysbj.select('table')
-    food_table_use = food_table[0]
-    food_table_unuse = food_table[1]
-    table_use_soup = BeautifulSoup(str(food_table_use), "lxml")
-    food_use_td = table_use_soup.select('td')
-    food_unuse_td = food_table_unuse.select('td')
-    usefood = food_list(disease_id, food_use_td)
-    unusefood = food_list(disease_id, food_unuse_td)
-    for use in usefood:
-        # use += (1)
-        sql = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
-              "VALUES(%s, %s, %s, %s, 1)"
-        insert_mysql(use, sql)
-    for unuse in unusefood:
-        # unuse += (2)
-        sql = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
-              "VALUES(%s, %s, %s, %s, 2)"
-        insert_mysql(unuse, sql)
+    if len(food_table) >= 2:
+        food_table_use = food_table[0]
+        food_table_unuse = food_table[1]
+        food_text = soup_ysbj.select('.yinshi_title')
+        usefood_text = food_text[0].get_text()
+        unusefood_text = food_text[1].get_text()
+        table_use_soup = BeautifulSoup(str(food_table_use), "lxml")
+        food_use_td = table_use_soup.select('td')
+        food_unuse_td = food_table_unuse.select('td')
+        usefood = food_list(disease_id, food_use_td)
+        unusefood = food_list(disease_id, food_unuse_td)
+        for use in usefood:
+            sql = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
+                  "VALUES(%s, %s, %s, %s, 1)"
+            insert_mysql(use, sql)
+        for unuse in unusefood:
+            sql = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
+                  "VALUES(%s, %s, %s, %s, 2)"
+            insert_mysql(unuse, sql)
+    else:
+        data_use = (disease_id, '', '', '')
+        sql_use = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
+                  "VALUES(%s, %s, %s, %s, 1)"
+        insert_mysql(data_use, sql_use)
+        data_unuse = (disease_id, '', '', '')
+        sql_unuse = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
+                    "VALUES(%s, %s, %s, %s, 2)"
+        insert_mysql(data_unuse, sql_unuse)
 
+    # 获取饮食宜忌表格下的文章内容
+        jb_ysbj_artbox = soup_ysbj.select('.art-box')
+        content_all_artbox = ''
+        for artbox in jb_ysbj_artbox:
+            content_all_artbox += str(artbox)
+        result_ysbj = del_a(content_all_artbox)
 
 spider()
