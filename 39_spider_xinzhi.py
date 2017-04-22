@@ -95,7 +95,7 @@ def spider():
     for page in page_url_list:
         url_list = get_xinzhi_url(page)
         # 爬取新知详情页面中首页的数据
-        for url in url_list[5:]:
+        for url in url_list:
             xinzhi_url = url[0]
             xinzhiimg_url = url[1]
             content_list = get_xinzhi_content(xinzhi_url)
@@ -105,6 +105,7 @@ def spider():
             data = tuple(content_list)
             sql = "INSERT INTO xinzhi(summary_img, title, publish_time, content) VALUES(%s, %s, %s, %s)"
             insert_mysql(data, sql)
+            time.sleep(10)
 
 
 # 获取分页下的新知文章URL地址,并返回列表
@@ -154,7 +155,9 @@ def get_xinzhi_content(url):
         xinzhi_title = xinzhi_title_select[0].get_text()
         xinzhi_time = ''
         xinzhi_content_select = soup.select(".main_con")
-        result_xinzhi_content = del_a(str(xinzhi_content_select[0]))
+        result_xinzhi_content = ''
+        for content_select in xinzhi_content_select:
+            result_xinzhi_content += del_a(str(content_select))
         pattern = re.compile(r'<strong style="text-align:right">.*?</strong>')
         result_xinzhi_content = re.sub(pattern, '', result_xinzhi_content)
         xinzhi_list = ['', xinzhi_title, xinzhi_time, result_xinzhi_content]
