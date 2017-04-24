@@ -81,15 +81,19 @@ def del_a(html):
 # 生成新知所有page页的url，并调用get_xinzhi_url方法
 def spider():
     # 页码总数
-    page_num = 35
+    page_num = 0
     # 爬取指定数量的页面
-    i = 14
+    i = 0
     page_url_list = []
     # 生成页码URL列表
     while i <= page_num:
-        url = 'http://news.39.net/xinzhi/'
-        url = url + 'index_' + str(i) + ".html"
-        page_url_list.append(url)
+        if i == 0:
+            url = 'http://news.39.net/xinzhi/'
+            page_url_list.append(url)
+        else:
+            url = 'http://news.39.net/xinzhi/'
+            url = url + 'index_' + str(i) + ".html"
+            page_url_list.append(url)
         i += 1
     # 生成新知URL列表
     for page in page_url_list:
@@ -105,7 +109,7 @@ def spider():
             data = tuple(content_list)
             sql = "INSERT INTO xinzhi(summary_img, title, publish_time, content) VALUES(%s, %s, %s, %s)"
             insert_mysql(data, sql)
-            time.sleep(10)
+            time.sleep(3)
 
 
 # 获取分页下的新知文章URL地址,并返回列表
