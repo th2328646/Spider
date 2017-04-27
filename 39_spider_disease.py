@@ -98,7 +98,10 @@ def food_list(disease_id, food_td):
         suggest = suggest_td.get_text()
         suggest_list.append(suggest)
     for food in name_list:
-        data_food_list.append((disease_id, name_list[i], reason_list[i], suggest_list[i]))
+        if not food:
+            data_food_list.append((disease_id, '', '', ''))
+        else:
+            data_food_list.append((disease_id, name_list[i], reason_list[i], suggest_list[i]))
         i += 1
     return data_food_list
 
@@ -106,9 +109,9 @@ def food_list(disease_id, food_td):
 # 生成疾病所有page页的url，并调用get_jbk_url方法
 def spider():
     # 页码总数
-    page_num = 100
+    page_num = 1454
     # 爬取指定数量的页面
-    i = 40
+    i = 1454
     page_url_list = []
     # 生成页码URL列表
     while i <= page_num:
@@ -117,19 +120,22 @@ def spider():
         page_url_list.append(url)
         i += 1
     # 生产疾病URL列表
+    x = 1
     for page in page_url_list:
         url_list = []
         jbk_url_list = get_jbk_url(page)
         if not jbk_url_list:
             continue
         url_list.extend(jbk_url_list)
-        print url_list
+        print x
+        x += 1
         # 爬取疾病详情页面中首页的数据
         for jb_url in url_list:
             jb_url += "//"
             if 'zhengzhuang' in jb_url:
                 continue
-            print get_jbk_content(jb_url)
+            get_jbk_content(jb_url)
+            time.sleep(3)
 
 
 # 获取分页下的疾病URL地址,并返回列表
@@ -152,14 +158,18 @@ def get_jbk_url(url):
 def get_jbk_content(url):
     html = send_request(url)
     soup = BeautifulSoup(html, "lxml")
+    if not soup:
+        return "No soup"
 
     # 获取文章标题 article_title
-    jb_name = soup.h1.string
-    print jb_name
+    jb_name_soup = soup.select("h1")
+    if not jb_name_soup:
+        return "No jb_name"
+    jb_name = jb_name_soup[0].get_text()
     # 将数据插入表disease
-    data_name = (jb_name,)
-    sql = "INSERT INTO disease(name) VALUES(%s)"
-    disease_id = insert_mysql(data_name, sql)
+    # data_name = (jb_name,)
+    # sql = "INSERT INTO disease(name) VALUES(%s)"
+    # disease_id = insert_mysql(data_name, sql)
 
     # 获取疾病首页信息
     info_dict = {}
@@ -212,7 +222,6 @@ def get_jbk_content(url):
         '常用药品': 'rec_drug'
     }
     result_dict = {
-        'disease_id': '',
         'disease_name': '',
         'disease_alias': '',
         'isMedical': '',
@@ -236,7 +245,6 @@ def get_jbk_content(url):
             if k1 == k:
                 result_dict[v1] = v
     result_dict['rec_drug'] = rec_drug
-    result_dict['disease_id'] = disease_id
     result_dict['disease_name'] = jb_name
 
     # 将数据插入表disease_info
@@ -247,12 +255,12 @@ def get_jbk_content(url):
         data_value.append(value)
     column_text = column_text[:-1]
     data = tuple(data_value)
-    sql = "INSERT INTO disease_info (" + column_text + ") VALUE (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" \
+    sql = "INSERT INTO disease_info (" + column_text + ") VALUE (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s" \
                                                        ", %s, %s, %s, %s, %s)"
-    insert_mysql(data, sql)
+    disease_id = insert_mysql(data, sql)
 
-    get_jbk_knowledge(url, disease_id)
     get_food(url, disease_id)
+    get_jbk_knowledge(url, disease_id)
 
 
 # 获取疾病详情页面下的疾病知识数据,并插入数据库
@@ -272,13 +280,21 @@ def get_jbk_knowledge(url, disease_id):
         '并发症': 'bfbz',
     }
 
+    knowledge_list = [disease_id]
+
     # 获取疾病简介页面内容
     url_jbzs = url + "jbzs"
     html = send_request(url_jbzs)
     soup_jbzs = BeautifulSoup(html, "lxml")
-    jb_summary = soup_jbzs.select('.intro')[0].get_text()
+    if not soup_jbzs:
+        result_jbzs = ''
+    else:
+        if soup_jbzs.select('.intro'):
+            result_jbzs = soup_jbzs.select('.intro')[0].get_text()
+        else:
+            result_jbzs = ''
+    knowledge_list.append(result_jbzs)
 
-    knowledge_list = [disease_id]
     # 获取典型症状页面内容
     url_zztz = url + "zztz"
     html = send_request(url_zztz)
@@ -366,6 +382,18 @@ def get_jbk_knowledge(url, disease_id):
     result_yyzl = result_yyzl_info + result_yyzl_artbox
     knowledge_list.append(result_yyzl)
 
+    # 获取护理页面内容
+    url_hl = url + "hl"
+    html = send_request(url_hl)
+    soup_hl = BeautifulSoup(html, "lxml")
+    jb_hl_artbox = soup_hl.select('.art-box')
+    content_all_artbox = ''
+    for artbox in jb_hl_artbox:
+        content_all_artbox += str(artbox)
+    result_hl_artbox = del_a(content_all_artbox)
+    result_hl = result_hl_artbox
+    knowledge_list.append(result_hl)
+
     # 获取并发症页面内容
     url_bfbz = url + "bfbz"
     html = send_request(url_bfbz)
@@ -384,31 +412,19 @@ def get_jbk_knowledge(url, disease_id):
     knowledge_list.append(result_bfbz)
 
     data = tuple(knowledge_list)
-    sql = "INSERT INTO disease_knowledge (disease_id, dxzz, fbyy, yf, lcjc, jb, zlff, bfz) " \
-          "VALUE (%s, %s, %s, %s, %s, %s, %s, %s)"
+    sql = "INSERT INTO disease_knowledge (disease_id, jbzs, dxzz, fbyy, yf, lcjc, jb, zlff, hl, bfz) " \
+          "VALUE (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
     insert_mysql(data, sql)
 
 
 # 获取饮食宜忌数据,并插入数据库
 def get_food(url, disease_id):
-    usefood_text = ''
-    unusefood_text = ''
-    food_text = ''
-    usefood_list = {
-        'name': '',
-        'reason': '',
-        'suggest': '',
-    }
-    unusefood_list = {
-        'name': '',
-        'reason': '',
-        'suggest': '',
-    }
-
     # 获取饮食保健页面内容
     url_ysbj = url + "ysbj"
     html = send_request(url_ysbj)
     soup_ysbj = BeautifulSoup(html, "lxml")
+
+    # 获取饮食宜忌表格中的内容
     food_table = soup_ysbj.select('table')
     if len(food_table) >= 2:
         food_table_use = food_table[0]
@@ -430,6 +446,8 @@ def get_food(url, disease_id):
                   "VALUES(%s, %s, %s, %s, 2)"
             insert_mysql(unuse, sql)
     else:
+        usefood_text = ''
+        unusefood_text = ''
         data_use = (disease_id, '', '', '')
         sql_use = "INSERT INTO disease_food(disease_id, food_name, reason, suggest, is_use) " \
                   "VALUES(%s, %s, %s, %s, 1)"
@@ -440,10 +458,19 @@ def get_food(url, disease_id):
         insert_mysql(data_unuse, sql_unuse)
 
     # 获取饮食宜忌表格下的文章内容
-        jb_ysbj_artbox = soup_ysbj.select('.art-box')
-        content_all_artbox = ''
+    jb_ysbj_artbox = soup_ysbj.select('.art-box')
+    content_all_artbox = ''
+    if jb_ysbj_artbox:
         for artbox in jb_ysbj_artbox:
             content_all_artbox += str(artbox)
         result_ysbj = del_a(content_all_artbox)
+    else:
+        result_ysbj = ''
+
+    data_suggest = (disease_id, usefood_text, unusefood_text, result_ysbj)
+    sql_suggest = "INSERT INTO disease_food_suggest(disease_id, use_suggest, unuse_suggest, ysjy) " \
+                  "VALUES(%s, %s, %s, %s)"
+    insert_mysql(data_suggest, sql_suggest)
+
 
 spider()
