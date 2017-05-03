@@ -72,9 +72,9 @@ def coding_change(data):
 # 去除html文本中的<a>标签
 def del_a(html):
     pattern1 = re.compile(r'<a.*?>')
-    result1 = re.sub(pattern1, '<p>', str(html))
+    result1 = re.sub(pattern1, '', str(html))
     pattern2 = re.compile(r'</a>')
-    result2 = re.sub(pattern2, '</p>', str(result1))
+    result2 = re.sub(pattern2, '', str(result1))
     return result2
 
 

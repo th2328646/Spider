@@ -72,9 +72,9 @@ def coding_change(data):
 # 去除html文本中的<a>标签
 def del_a(html):
     pattern1 = re.compile(r'<a.*?>')
-    result1 = re.sub(pattern1, '<p>', str(html))
+    result1 = re.sub(pattern1, '', str(html))
     pattern2 = re.compile(r'</a>')
-    result2 = re.sub(pattern2, '</p>', str(result1))
+    result2 = re.sub(pattern2, '', str(result1))
     return result2
 
 
@@ -136,7 +136,7 @@ def get_url_list():
         url += "-c3"
         url_list_bjp.append(url)
 
-    for url in url_list_zxy:
+    for url in url_list_zxy[7:]:
         spider_zxy(url)
 
     for url in url_list_bjp:
@@ -171,10 +171,12 @@ def spider_zxy(url):
                 content_list = get_content(zxy_url)
                 if not content_list:
                     continue
+                if len(content_list) != 4:
+                    continue
                 data = tuple(content_list)
                 sql = "INSERT INTO drug(drug_name, img_src, tag, specification) VALUES(%s, %s, %s, %s)"
                 insert_mysql(data, sql)
-                time.sleep(3)
+                time.sleep(1)
         else:
             continue
 
